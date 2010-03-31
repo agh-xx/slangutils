@@ -1,0 +1,92 @@
+#!/usr/bin/env slsh
+
+require ("cmdopt");
+
+variable
+  Mv_Version = "0.1.2",
+  Mv_Interactive = 0,
+  Mv_Verbose = 0,
+  Mv_Force = 0,
+  Mv_Noclobber = 0,
+  Mv_Backup = 0,
+  Mv_Suffix = "~",
+  Mv_Update = 0,
+  Cp_Noclobber = 0,
+  Cp_Interactive = 0,
+  Cp_Backup = 0,
+  Cp_Suffix = "~",
+  Cp_Verbose = 0,
+  Cp_Update = 0,
+  Cp_Recursive = 1,
+  Rm_Interactive = 0,
+  Rm_Verbose = 0,
+  Rm_Force = 0,
+  Rm_Recursive = 1,
+  file_list = {},
+  Slsh_Path  = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+  set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+()= evalfile ("file");
+()= evalfile ("dir");
+()= evalfile ("recursive");
+()= evalfile ("stats");
+()= evalfile ("copy");
+()= evalfile ("remove");
+()= evalfile ("move");
+
+private define mv_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s [options] files... dir\n", path_basename (__argv[0])),
+      sprintf ("   or: %s [options] file1 file2\n", path_basename (__argv[0])),
+      "Options:\n",
+      " -i, --interactive       Prompt before overwrite\n",
+      " -f, --force             Do not prompt before overwriting \n",
+      " -n, --no-clobber        Do not clobber\n",
+      " -v, --verbose           Be verbose  \n",
+      " -b, --backup            Make a backup of each existing destination file\n",
+      " -u, --update            Move only when source is newer than the destination file\n",
+      " -S, --suffix=SUFFIX     Override the default backup suffix ~\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n",
+    ];
+   print_usage (Opts);
+   exit (0);
+}
+
+private define mv_version ()
+{
+   print_version (Mv_Version);
+   exit (0);
+}
+
+
+define slsh_main ()
+{
+   variable c = cmdopt_new ();
+   c.add("h|help", &mv_usage);
+   c.add("version", &mv_version);
+   c.add("i|interactive", &Mv_Interactive);
+   c.add("f|force", &Mv_Force);
+   c.add("n|no-clobber", &Mv_Noclobber);
+   c.add("v|verbose", &Mv_Verbose);
+   c.add("b|backup", &Mv_Backup);
+   c.add("u|update", &Mv_Update);
+   c.add("S|suffix", &Mv_Suffix; type="string");
+   variable i = c.process (__argv, 1);
+
+   if (i + 2 > __argc)
+     mv_usage ();
+
+   if (Mv_Interactive && Mv_Force)
+     Mv_Interactive = 0;
+
+
+   if (-1 == mv_main (__argv[[i:__argc-2]], __argv[-1]))
+     exit (1);
+
+   exit (0);
+}

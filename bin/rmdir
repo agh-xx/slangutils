@@ -1,0 +1,107 @@
+#!/usr/bin/env slsh
+
+require ("cmdopt");
+
+private variable
+  Rmdir_Version = "0.1.0",
+  Rmdir_Verbose = 0,
+  Rmdir_Parents = 0,
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+
+private define rmdir_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s [options] dir... dir\n", path_basename (__argv[0])),
+      "Options:\n",
+      " -v, --verbose           Be verbose  \n",
+      " -p, --parents           Remove DIRECTORY and its ancestors\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+    ];
+  print_usage (Opts);
+  exit (0);
+}
+
+private define rmdir_version ()
+{
+  print_version (Rmdir_Version);
+  exit (0);
+}
+
+private define rmdir_do (path)
+{
+  if (-1 == rmdir (path))
+    {
+      ()= fprintf (stderr, "%s: failed to remove `%s': %s\n", path_basename (__argv[0]),
+                   path, errno_string (errno));
+      return -1;
+    }
+    
+  if (Rmdir_Verbose)
+    ()= fprintf (stdout, "%s: removing directory `%s'\n", path_basename (__argv[0]), path);
+
+  return 0;
+}
+
+private define rmdir_main(path)
+{
+  variable root="", st_path = stat_file (path);
+  if (NULL== st_path)
+    {
+      ()= fprintf (stderr, "%s: failed to remove `%s': Not such directory\n",
+                   path_basename (__argv[0]),  path); 
+      return -1;
+    }
+
+  ifnot (Rmdir_Parents)
+    {
+      if (-1 == rmdir_do (path))
+        return -1;
+      return 0;
+    }
+   
+  variable path_arr = strchop (path, '/', 0);
+  if (0 == strlen (path_arr[0]))
+    {
+      path_arr[1] = strcat ("/", path_arr[1]);
+      path_arr = path_arr[[1: length (path_arr) -1]];
+    }
+
+  variable p, newpath, len = length (path_arr);
+  _for p (len - 1, 0, -1)
+    {
+      newpath = strjoin (path_arr[[0:p]], "/");
+      if (-1 == rmdir_do (newpath))
+        return -1;
+    }
+
+  return 0;
+}
+
+define slsh_main ()
+{
+  variable c = cmdopt_new ();
+  c.add("h|help", &rmdir_usage);
+  c.add("version", &rmdir_version);
+  c.add("v|verbose", &Rmdir_Verbose);
+  c.add("p|parents", &Rmdir_Parents);
+  variable i = c.process (__argv, 1);
+    
+  if (i + 1 > __argc)
+    rmdir_usage ();
+  
+  variable dirs = (__argv[[i: length (__argv) -1]]),
+           len = length (dirs), dir, exit_code = 0;
+  _for dir (0, len -1, 1)
+    {
+      if (-1 == rmdir_main (dirs[dir]))
+        exit_code = 1;
+    }
+
+  exit (exit_code);
+}

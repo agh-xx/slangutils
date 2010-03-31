@@ -1,0 +1,114 @@
+#!/usr/bin/env slsh
+
+require ("cmdopt");
+
+variable
+  Tail_Version = "0.1.0",
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+()= evalfile ("dir");
+
+private define tail_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s [option] file1...file2\n", path_basename (__argv[0])),
+      "Options:\n",
+      " -n, --lines=n           Output the last n lines, instead of the last 10\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+    ];
+
+  print_usage (Opts);
+  exit (0);
+}
+
+private define tail_version ()
+{
+  print_version (Tail_Version);
+  exit (0);
+}
+
+define slsh_main ()
+{
+  variable lines = 10,
+  c = cmdopt_new ();
+  c.add("n|lines", &lines; type="int");
+  c.add("h|help", &tail_usage);
+  c.add("version", &tail_version);
+  variable i = c.process (__argv, 1);
+
+  variable buf, line, len;
+  if (1 == __argc || __is_same (__argv[i], "-"))
+    {
+      buf = fgetslines (stdin);
+      len = length (buf);
+      if (len >= lines)
+        buf = buf[[len - lines:]];
+
+      foreach line (buf)
+        ()= fputs (line, stdout);
+
+      exit (0);
+    }
+
+  variable file, fp, exit_code = 0;
+  foreach file (__argv[[i:]])
+    {
+      if (__is_directory (file))
+        {
+          if (__is_same (file, __argv[i]))
+            ()= fprintf (stderr, "%s: error reading `%s': Is a directory\n",
+                path_basename (__argv[0]), file);
+          else
+            ()= fprintf (stderr, "\n%s: error reading `%s': Is a directory\n",
+                path_basename (__argv[0]), file);
+
+          exit_code = 1;
+          continue;
+        }
+
+      variable st = stat_file (file);
+      if (NULL == st)
+        {
+          if (__is_same (file, __argv[i]))
+            ()= fprintf (stderr, "%s: cannot open `%s' for reading: %s\n",
+                path_basename (__argv[0]), file, errno_string (errno));
+          else
+            ()= fprintf (stderr, "\n%s: cannot open `%s' for reading: %s\n",
+                path_basename (__argv[0]), file, errno_string (errno));
+
+          exit_code = 1;
+          continue;
+        }
+
+      fp = fopen (file, "r");
+      if (NULL == fp)
+        {
+          exit_code = 1;
+          continue;
+        }
+
+      buf = fgetslines (fp);
+      len = length (buf);
+      if (len >= lines)
+        buf = buf[[len - lines:]];
+      
+      if (1 < length (__argv[[i:]])) 
+        if (__is_same (file, __argv[i]))
+          ()= fprintf (stdout, "==> %s <==\n", file);
+        else
+          ()= fprintf (stdout, "\n==> %s <==\n", file);
+
+      foreach line (buf)
+        ()= fputs (line, stdout);
+
+      if (-1 == fclose (fp))
+        exit_code = 1;
+    }
+
+  exit (exit_code);
+}

@@ -1,0 +1,129 @@
+
+rm
+
+ SYNOPSIS
+  Remove a file
+
+ USAGE
+  Int_Type rm ([String_Type args,] String_Type file)
+
+ DESCRIPTION
+  This function removes a file from the filesystem.
+  It returns 0 if removes the file successfully and -1 with
+  a meaningful message upon error.
+  It takes the following set of optional arguments: 
+  
+  i,  makes the whole operation interactive
+  f,  don't prompt before every removal
+  r,  remove directories recursively
+  v,  be verbose
+
+ EXAMPLE
+  
+  variable file = "path/to/file";
+  rm (file);
+  rm ("ivf", file);
+
+ NOTES
+ 
+ if "f" and file doesn't exists, it returns 0,  otherwise -1
+ (that is the gnu-rm behavior)
+  
+--------------------------------------------------------------
+    
+cp
+  
+ USAGE
+  Int_Type cp ([String_Type args,] String_Type file, String_Type file)
+
+ DESCRIPTION
+  This function copy a file from the filesystem.
+  It returns 0 if copies the file successfully and -1 with
+  a meaningful message upon error.
+  It takes the following set of optional arguments: 
+  
+  i,  makes the whole operation interactive
+  f,  don't prompt before every removal
+  v,  be verbose
+  u,  copy only when source is newer than the destination file
+  n,  do not clobber
+  b,  make a backup of each existing destination file
+  r,  copy directories recursively
+  
+
+ EXAMPLE
+  
+  variable source = "path/to/file";
+  variable dest  = "path/to/anotherfile";
+  cp (source, dest);
+  cp ("ivfub", source, dest);
+
+ NOTES
+ 
+ if "u" and a variable Cp_Suffix was set by the interpreter then this is the
+ suffix that will be used, otherwise it defaults to "~"  
+
+--------------------------------------------------------------
+
+mv
+  
+ USAGE
+  Int_Type mv ([String_Type args,] String_Type file, String_Type file)
+
+ DESCRIPTION
+  This function moves a file or a directory.
+  It returns 0 if moves the file successfully and -1 with
+  a meaningful message upon error.
+  It takes the following set of optional arguments:
+  
+  i,  makes the whole operation interactive
+  f,  don't prompt before every removal
+  v,  be verbose
+  u,  copy only when source is newer than the destination file
+  n,  do not clobber
+  b,  make a backup of each existing destination file
+
+ EXAMPLE
+  
+  variable source = "path/to/file";
+  variable dest  = "path/to/dir";
+  mv (source, dest);
+  cp ("ivfubn", source, dest);
+
+ NOTES
+ 
+ if "u" and a variable Mv_Suffix was set by the interpreter then this is the
+ suffix that will be used, otherwise it defaults to "~"  
+
+--------------------------------------------------------------
+
+_mkdir
+
+ USAGE
+  Int_Type _mkdir ([String_Type args,] [String_Type mode,] String_Type directory, ...)
+
+ DESCRIPTION
+  This function creates a director[y/ies] or any additional parent
+  directories if needed.
+  It returns 0 if creates the directories successfully and -1 with
+  a meaningful message upon error.
+  It takes the following set of optional arguments:
+  
+  v,  be verbose
+  p,  create parent directories if needed
+  m,  create the directory with a specific mode, that should be the second
+      argument
+  x,  return at the first error
+
+ EXAMPLE
+
+  _mkdir ("vpm", "0755", "/tmp/one/two");
+
+ NOTES
+
+ Since the function can take multiply directories as arguments, you have to
+ use the "-x" argument to abort and return immediately, as soon an error
+ occurs during an operation, and to not continue with the rest of the
+ arguments.
+
+--------------------------------------------------------------

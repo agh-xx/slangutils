@@ -1,0 +1,61 @@
+#!/usr/bin/env slsh
+
+require ("cmdopt");
+
+variable
+  Mkdir_Version = "0.1.0",
+  Mkdir_Verbose = 0,
+  Mkdir_Parents = 0,
+  Mkdir_Mode = 0,
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+()= evalfile ("mkdir");
+
+private define mkdir_usage ()
+{
+  variable Opts =
+     [
+      sprintf ("Usage: %s [options] dir... dir\n", path_basename (__argv[0])),
+      "Options:\n",
+      " -v, --verbose           Be verbose  \n",
+      " -p, --parents           Make parent directories as needed\n",
+      " -m, --mode=MODE         Set file mode\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+     ];
+   print_usage (Opts);
+   exit (0);
+}
+
+private define mkdir_version ()
+{
+   print_version (Mkdir_Version);
+   exit (0);
+}
+
+define slsh_main ()
+{
+   variable c = cmdopt_new ();
+   c.add("h|help", &mkdir_usage);
+   c.add("version", &mkdir_version);
+   c.add("v|verbose", &Mkdir_Verbose);
+   c.add("p|parents", &Mkdir_Parents);
+   c.add("m|mode", &Mkdir_Mode; type="int");
+   variable i = c.process (__argv, 1);
+     
+   if (i + 1 > __argc)
+     mkdir_usage ();
+   
+   variable dirs = (__argv[[i: length (__argv) -1]]),
+            len = length (dirs), dir, exit_code = 0;
+   _for dir (0, len -1, 1)
+     {
+       if (-1 == mkdir_main (dirs[dir]))
+         exit_code = 1;
+     }
+
+   exit (exit_code);
+}

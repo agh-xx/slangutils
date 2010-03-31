@@ -1,0 +1,79 @@
+#!/usr/bin/env slsh
+
+require ("cmdopt");
+
+variable
+  Uname_Version = "0.1.0",
+  Uname_Text = "",
+  Slsh_Path  = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+()= evalfile ("uname");
+
+private define uname_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s [options]\n", path_basename (__argv[0])),
+      sprintf ("Print certain system information.  With no OPTION, same as -s.\n"),
+      "Options:\n",
+      " -a, --all               Print all information\n",
+      " -s, --kernel-name       Print the kernel name\n",
+      " -n, --nodename          Print the network node hostname\n",
+      " -r, --kernel-release    Print the kernel release\n",
+      " -v, --kernel-version    Print the kernel version\n",
+      " -m, --machine           Print the machine hardware name\n",
+      " -p, --processor         Print the processor type\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+    ];
+  print_usage (Opts);
+  exit (0);
+}
+
+private define uname_version ()
+{
+  print_version (Uname_Version);
+  exit (0);
+}
+
+define slsh_main ()
+{
+  variable found = 0;
+  if (1 == __argc)
+    uname_main ("s");
+
+  foreach (__argv)
+    {
+      variable arg = ();
+      if (string_match (arg, "-.*a", 1) || __is_same (arg, "--all"))
+        {
+          found = 1;
+          uname_main ("a");
+          break;
+        }
+    }
+
+  ifnot (found)
+    {
+      variable c = cmdopt_new ();
+      c.add("h|help", &uname_usage);
+      c.add("version", &uname_version);
+      c.add("s|kernel-name", &uname_main, "s");
+      c.add("n|nodename", &uname_main, "n");
+      c.add("r|kernel-release", &uname_main, "r");
+      c.add("v|kernel-version", &uname_main, "v");
+      c.add("m|machine", &uname_main, "m");
+      c.add("p|processor", &uname_main, "p");
+      variable i = c.process (__argv, 1);
+    }
+
+  ()= fprintf (stdout, "%s\n", strtrim_beg (strtrim_end (Uname_Text))); 
+
+  Uname_Text = "";
+
+  return 0;
+
+}

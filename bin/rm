@@ -1,0 +1,67 @@
+#!/usr/bin/slsh
+
+require ("cmdopt");
+
+variable
+  Rm_Version = "0.2.1",
+  Rm_Interactive = 0,
+  Rm_Verbose = 0,
+  Rm_Force = 0,
+  Rm_Recursive = 0,
+  file_list = {},
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+()= evalfile ("dir");
+()= evalfile ("recursive");
+()= evalfile ("remove");
+
+private define rm_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s [options] file...\n", path_basename (__argv[0])),
+      "Options:\n",
+      " -i, --interactive       Prompt before every removal\n",
+      " -f, --force             Do not prompt before every removal\n",
+      " -v, --verbose           Be verbose  \n",
+      " -r, -R, --recursive     Remove directories recursively\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+    ];
+
+  print_usage (Opts);
+  exit (0);
+}
+
+private define rm_version ()
+{
+  print_version (Rm_Version);
+  exit (0);
+}
+
+define slsh_main ()
+{
+  variable c = cmdopt_new ();
+  c.add("h|help", &rm_usage);
+  c.add("version", &rm_version);
+  c.add("i|interactive", &Rm_Interactive);
+  c.add("f|force", &Rm_Force);
+  c.add("v|verbose", &Rm_Verbose);
+  c.add("r|R|recursive", &Rm_Recursive);
+  variable i = c.process (__argv, 1);
+
+  if (i + 1 > __argc)
+    rm_usage ();
+
+  if (Rm_Interactive && Rm_Force)
+    Rm_Interactive = 0;
+
+  if (-1 == rm_main (__argv[[i:__argc-1]]))
+    exit (1);
+
+  exit (0);
+
+}

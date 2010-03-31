@@ -1,0 +1,194 @@
+#!/usr/bin/slsh
+
+require ("cmdopt");
+require ("curl");
+
+private variable
+  Curl_Version = "0.1.0",
+  Curl_Verbose = 0,
+  Curl_Outfile,
+  Curl_Cacert,
+  Curl_Followlocation = 0,
+  Curl_Connectiontimeout = 0,
+  Curl_Silent = 0,
+  Curl_Showerrors = 0,
+  Curl_Useragent,
+  Curl_Remoteall = 0,
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+% Is there any other way to search for *.sl, based on the relative path
+% of the current script? If we specify "../share/slsh", and we are in a different
+% directory of the script, this will fail, neither getcwd () works in that case
+
+% I'm not sure if we need to add the get_slang_path () here, but nothing fails
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+()= evalfile ("file");
+
+private define curl_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s [options] url\n", path_basename (__argv[0])),
+      "Options:\n",
+      " -v                      Be verbose  \n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n",
+      " -O, --remote-name       Write output to a file named as the remote file\n",
+      " --remote-name-all       Use the remote file name for all URLs\n",
+      " -o <file>               Write output to <file> instead of stdout\n",
+      " --cacert <file>         CA certificate to verify peer against (SSL)\n",
+      " -L, --location          Follow Location\n",
+      " --connect-timeout <seconds> Maximum time allowed for connection\n",
+      " -s, --silent            Don't output anything\n",
+      " -S, --show-error        Show errors when in silent mode\n",
+      " -A, --user-agent <string> User-Agent to send to server\n"       
+    ];
+  print_usage (Opts);
+  exit (0);
+}
+
+private define curl_version ()
+{
+  print_version (Curl_Version);
+  exit (0);
+}
+
+private define curl_outfile (out)
+{
+  % whatever option (-O or -o) has given first
+  ifnot (__is_initialized(&Curl_Outfile))
+    Curl_Outfile = out;
+}
+
+private define write_callback (fp, str)
+{
+  variable len = bstrlen (str);
+  if (len != fwrite (str, fp))
+    return -1;
+
+  return 0;
+}
+
+private define curl_main(url)
+{
+  variable progressbar = 0, fp, c, file;
+  if (__is_initialized (&Curl_Outfile))
+    {
+      if (__is_same (Curl_Outfile, "remote"))
+        % Is there any case that this will fail?
+        file = strchop (url, '/', 0)[-1];
+      else
+        file = Curl_Outfile;
+
+      fp = fopen (file, "w");
+      % Don't make sense for a progress bar when fp is stdout
+      progressbar = 1;
+      }
+  else
+    fp = stdout;
+
+  ifnot (Curl_Silent)
+    ()= fprintf (stdout, "%s: downloading `%s'\n", path_basename (__argv[0]), url);
+
+  variable e;
+  try (e)
+    {
+      c = curl_new (url);
+
+      if (Curl_Followlocation)
+        curl_setopt (c, CURLOPT_FOLLOWLOCATION, 1);
+
+      curl_setopt (c, CURLOPT_WRITEFUNCTION, &write_callback, fp);
+
+      if (Curl_Connectiontimeout)
+        curl_setopt (c, CURLOPT_CONNECTTIMEOUT, Curl_Connectiontimeout);
+
+      curl_setopt (c, CURLOPT_NOSIGNAL, 1);
+
+      if ((progressbar) && (0 == Curl_Silent))
+        curl_setopt (c, CURLOPT_NOPROGRESS, 0);
+
+      if (Curl_Verbose)
+        curl_setopt (c, CURLOPT_VERBOSE, 1);
+
+      if (__is_initialized (&Curl_Cacert))
+        curl_setopt (c, CURLOPT_CAINFO, Curl_Cacert);
+
+      curl_perform (c);
+        
+    }
+  catch CurlError:
+    {
+      if ((0 == Curl_Silent) || ((Curl_Silent) && (Curl_Showerrors)))
+        vmessage ("Unable to retrieve `%s'\nException: %s", url, e.message);
+      if (__is_initialized (&Curl_Outfile))
+        ()= remove (file);
+      return -1;
+    }
+
+    if (-1 == fclose (fp))
+      {
+        if (__is_initialized (&Curl_Outfile))
+          {
+            if ((0 == Curl_Silent) || ((Curl_Silent) && (Curl_Showerrors)))
+              vmessage ("Unable to close the %s\n", file);
+              ()= remove (file);
+              return -1;
+          }
+      }
+
+  % Don't know why can't catch `% 404 Not Found', but neither the curl utility does
+  % We'll use the fread_file function (by reading 100 bytes we have enough lines
+  % to know if there is a matched string)
+  variable t = fread_file (file, 100);
+  if (string_match (t, "404 Not Found", 1))
+    % return -1, and we'll warn even if silent is given
+    {
+      ()= fprintf (stdout, "%s: remote file `%s' didn't retrieved (404 Not Found)\n",
+                   path_basename (__argv[0]), file);
+      return -1;
+    }
+
+  return 0;
+}
+
+define slsh_main ()
+{
+  variable c = cmdopt_new ();
+  c.add("h|help", &curl_usage);
+  c.add("version", &curl_version);
+  c.add("v", &Curl_Verbose);
+  c.add("O|remote-name", &curl_outfile, "remote");
+  c.add("o|output", &curl_outfile; type="string");
+  c.add("remote-name-all", &Curl_Remoteall);
+  c.add("cacert", &Curl_Cacert; type="string");
+  c.add("L|location", &Curl_Followlocation);
+  c.add("connect-timeout", &Curl_Connectiontimeout; type="int");
+  c.add("s|silent", &Curl_Silent);
+  c.add("S|show-errors", &Curl_Showerrors);
+  c.add("A|user-agent", &Curl_Useragent; type="string");
+  variable i = c.process (__argv, 1);
+
+  if (i + 1 > __argc)
+    curl_usage ();
+
+  variable urls = (__argv[[i: length (__argv) -1]]),
+           len = length (urls), url, exit_code = 0;
+
+  % if more than one url, it makes sense to use remote's filename
+  % Upstream doesn't do this; you need to specify --remote-name-all
+  % or to pass with every given url an -o|-O, else to stdout
+  % We can do this if we reparse the command line options,
+  % if doesn't add complexity
+  if ((1 < len) || (Curl_Remoteall))
+    Curl_Outfile = "remote";
+
+  _for url (0, len -1, 1)
+    {
+      if (-1 == curl_main (urls[url]))
+        exit_code = 1;
+    }
+
+  exit (exit_code);
+}

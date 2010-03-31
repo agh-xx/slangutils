@@ -1,0 +1,88 @@
+#!/usr/bin/slsh
+
+require ("cmdopt");
+
+variable
+  Cp_Version = "0.1.2",
+  Cp_Interactive = 0,
+  Cp_Verbose = 0,
+  Cp_Force = 0,
+  Cp_Noclobber = 0,
+  Cp_Backup = 0,
+  Cp_Suffix = "~",
+  Cp_Update = 0,
+  Cp_Recursive = 0,
+  file_list = {},
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+()= evalfile ("stats.sl");
+()= evalfile ("dir");
+()= evalfile ("file");
+()= evalfile ("recursive");
+()= evalfile ("copy");
+
+private define cp_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s [options] files... dir\n", path_basename (__argv[0])),
+      sprintf ("   or: %s [options] file1 file2\n", path_basename (__argv[0])),
+      "Options:\n",
+      " -i, --interactive       Prompt before overwrite\n",
+      " -f, --force             Do not prompt before overwriting \n",
+      " -n, --no-clobber        Do not clobber\n",
+      " -v, --verbose           Be verbose  \n",
+      " -b, --backup            Make a backup of each existing destination file\n",
+      " -u, --update            Copy only when source is newer than the destination file\n",
+      " -S, --suffix=SUFFIX     Override the default backup suffix ~\n",
+      " -r, -R, --recursive     Copy directories recursively\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+    ];
+
+  print_usage (Opts);
+  exit (0);
+}
+
+private define cp_version ()
+{
+  print_version (Cp_Version);
+  exit (0);
+}
+
+define slsh_main ()
+{
+  variable c = cmdopt_new ();
+  c.add("h|help", &cp_usage);
+  c.add("version", &cp_version);
+  c.add("i|interactive", &Cp_Interactive);
+  c.add("f|force", &Cp_Force);
+  c.add("n|no-clobber", &Cp_Noclobber);
+  c.add("v|verbose", &Cp_Verbose);
+  c.add("b|backup", &Cp_Backup);
+  c.add("u|update", &Cp_Update);
+  c.add("r|R|recursive", &Cp_Recursive);
+  c.add("S|suffix", &Cp_Suffix; type="string");
+  variable i = c.process (__argv, 1);
+
+  if (i + 2 > __argc)
+    cp_usage ();
+
+  if (Cp_Interactive && Cp_Force)
+    Cp_Interactive = 0;
+ 
+  if (Cp_Noclobber && Cp_Backup)
+    {
+      ()= fprintf (stderr, "%s: options --backup and --no-clobber are mutually exclusive\n",
+                   path_basename (__argv[0]));
+      exit (1);
+    }
+
+  if (-1 == copy (__argv[[i:__argc-2]], __argv[-1]))
+    exit (1);
+
+  exit (0);
+}

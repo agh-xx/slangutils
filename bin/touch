@@ -1,0 +1,113 @@
+#!/usr/bin/env slsh
+
+require ("cmdopt");
+
+variable
+  Touch_Version = "0.1.0",
+  Touch_NoCreate = 0,
+  Touch_Mtime = 0,
+  Touch_Atime = 0,
+  Slsh_Path  = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+
+private define touch_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s [option] file\n", path_basename (__argv[0])),
+      "Options:\n",
+      " -a                      Change only the access time\n",
+      " -c, --no-create         Do not create any files\n",
+      " -m                      Change only the modification time\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+    ];
+  print_usage (Opts);
+  exit (0);
+}
+
+private define touch_version ()
+{
+  print_version (Touch_Version);
+  exit (0);
+}
+
+define touch_main (file)
+{
+  variable st = stat_file (file);
+  if (NULL == st)
+    {
+      ifnot (Touch_NoCreate)
+        {
+          variable fp = fopen (file, "w");
+          if (NULL == fp)
+            {
+              ()= fprintf (stderr, "%s: cannot touch `%s': %s\n",
+                  path_basename (__argv[0]), file, errno_string (errno));
+              return -1;
+            }
+
+          if (-1 == fclose (fp))
+            return -1;
+           
+          return 0;  
+        }
+
+      return 0;  
+    } 
+
+  if (Touch_Atime && 0 == Touch_Mtime)
+    {
+      if (-1 == utime (file, _time (), st.st_mtime))
+        {
+          ()= fprintf (stderr, "%s: cannot touch `%s': %s\n",
+              path_basename (__argv[0]), file, errno_string (errno));
+          return -1;
+        }
+
+      return 0;
+    }
+
+  if (Touch_Mtime && 0 == Touch_Atime)
+    {
+      if (-1 == utime (file, st.st_atime, _time ()))
+        {
+          ()= fprintf (stderr, "%s: cannot touch `%s': %s\n",
+              path_basename (__argv[0]), file, errno_string (errno));
+          return -1;
+        }
+
+      return 0;
+    }
+   
+  if (-1 == utime (file, _time (), _time ()))
+    {
+      ()= fprintf (stderr, "%s: cannot touch `%s': %s\n",
+          path_basename (__argv[0]), file, errno_string (errno));
+      return -1;
+    }
+
+  return 0;
+}       
+  
+define slsh_main ()
+{
+  variable c = cmdopt_new ();
+  c.add("h|help", &touch_usage);
+  c.add("version", &touch_version);
+  c.add("a", &Touch_Atime);
+  c.add("c|--no-create", &Touch_NoCreate);
+  c.add("m", &Touch_Mtime);
+  variable i = c.process (__argv, 1);
+
+  if (i + 1 > __argc)
+    touch_usage ();
+  
+  if (-1 == touch_main (__argv[i]))
+    exit (1);
+
+  exit (0);
+}

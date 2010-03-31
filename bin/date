@@ -1,0 +1,43 @@
+#!/usr/bin/env slsh
+
+require ("cmdopt");
+
+variable
+  Date_Version = "0.1.0",
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+()= evalfile ("time");
+
+private define date_usage ()
+{
+  variable Opts =
+     [
+      sprintf ("Usage: %s [options] dir... dir\n", path_basename (__argv[0])),
+      "Options:\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+     ];
+   print_usage (Opts);
+   exit (0);
+}
+
+private define date_version ()
+{
+   print_version (Date_Version);
+   exit (0);
+}
+
+define slsh_main ()
+{
+   variable c = cmdopt_new ();
+   c.add("h|help", &date_usage);
+   c.add("version", &date_version);
+   variable i = c.process (__argv, 1);
+     
+   if (i + 1 > __argc)
+     () = fprintf (stdout, "%s\n", time_now ());
+   
+}
