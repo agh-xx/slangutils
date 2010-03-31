@@ -1,0 +1,58 @@
+#!/usr/bin/env slsh
+
+require ("cmdopt");
+
+variable
+  Basename_Version = "0.1.0",
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+
+private define basename_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s Name [SUFFIX] \n", path_basename (__argv[0])),
+      "Options:\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+    ];
+
+  print_usage (Opts);
+  exit (0);
+}
+
+private define basename_version ()
+{
+  print_version (Basename_Version);
+  exit (0);
+}
+
+define slsh_main ()
+{
+  variable c = cmdopt_new ();
+  c.add("h|help", &basename_usage);
+  c.add("version", &basename_version);
+  variable i = c.process (__argv, 1);
+ 
+  if (1 == __argc)
+    {
+      ()= fprintf (stderr, "%s: missing operand\n", path_basename (__argv[0]));
+      exit (1);
+    }
+    
+  variable file = __argv[1];
+
+  if (3 == __argc)
+    if (__is_same (path_extname (file), __argv[2]))
+      {
+        ()= fprintf (stdout, "%s\n", path_basename_sans_extname (file));
+        exit (0);
+      }
+
+  ()= fprintf (stdout, "%s\n", path_basename (file));
+
+  exit (0);
+}
