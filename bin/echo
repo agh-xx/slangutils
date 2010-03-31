@@ -1,0 +1,62 @@
+#!/usr/bin/slsh
+
+require ("cmdopt");
+
+variable
+  Echo_Version = "0.1.0",
+  Echo_Newline = 0,
+  Echo_Escapes = 0,
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+
+private define echo_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s Name \n", path_basename (__argv[0])),
+      "Options:\n",
+      " -n                      Do not output the trailing newline\n",
+      " -e                      Enable interpretation of backslash escapes\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+    ];
+
+  print_usage (Opts);
+  exit (0);
+}
+
+private define echo_version ()
+{
+  print_version (Echo_Version);
+  exit (0);
+}
+
+define slsh_main ()
+{
+  variable c = cmdopt_new ();
+  c.add("n", &Echo_Newline);
+  c.add("e", &Echo_Escapes);
+  c.add("h|help", &echo_usage);
+  c.add("version", &echo_version);
+  variable i = c.process (__argv, 1);
+  
+  variable str, args = strjoin(__argv[[i:]], " ");
+  
+  (str, )= strreplace (args, "\n", "\\n", strlen (args));
+
+  if (Echo_Escapes)
+    { 
+      str = strcat ("\"", str, "\"");
+      ()= fprintf (stdout, "%s", eval (str));
+    }
+  else
+    ()= fprintf (stdout, "%s", args);
+
+  ifnot (Echo_Newline)
+    ()= fputs ("\n", stdout);
+
+  exit (0);     
+}
