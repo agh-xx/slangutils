@@ -40,9 +40,17 @@ define slsh_main ()
 
   if (i + 1 > __argc)
     which_usage ();
+  
+  variable path_to_exec;
 
-  ifnot (which (__argv[i]))
-    exit (1);
-
-  exit (0);
+  ifnot (which (__argv[i], &path_to_exec))
+    {
+      ()= fprintf (stderr, "%s not found\n", __argv[i]);
+      exit (1);
+    }
+  else
+    {
+      ()= fprintf (stdout, "%s\n", path_to_exec);
+      exit (0);
+    }
 }

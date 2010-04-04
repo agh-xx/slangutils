@@ -50,7 +50,7 @@ define __is_dir_empty (dir)
   return 0;
 }
 
-define which (file)
+define which (file, path_to_exec)
 {
   variable path = getenv ("PATH");
   if (NULL == path)
@@ -65,11 +65,10 @@ define which (file)
 
       if (__is_file_executable (abspath))
         {
-          ()= fprintf (stdout, "%s\n", abspath);
+          @path_to_exec = abspath;
           return 1;
         }
     }
 
-  ()= fprintf (stderr, "%s not found\n", file);
   return 0;
 }
