@@ -17,11 +17,25 @@ The scripts are trying to emulate (with few exceptions), mainly the
 Gnu-Coreutils, so there is nothing new to learn, if somebody is already
 familiar with their Gnu-counterparts.
 
+Many of the shared functions can be used in an interactive slsh session.
+This it would be possible, if you put in ~/.slshrc something like:
+ 
 
-This is a work in progress, as many advanced techniques of `S-Lang',
-should be incorporated in the scripts with time. However are usable
-for daily use, but they might contain bugs so the user should be careful
-with their usage. Please report any bugs, at:
+variable
+  slshpath = path_concat (getenv ("HOME"), "slang"),
+  helpfiles = glob (path_concat (slshpath, "share/doc/*.hlp"));
+
+set_doc_files ([helpfiles, get_doc_files ()]);
+
+prepend_to_slang_load_path (path_concat (slshpath, "share/slsh"));
+
+()= evalfile ("localload");
+
+
+This is a work in progress and at early stage, as many advanced techniques
+of `S-Lang', should be incorporated in the scripts with time. However are
+usable for daily use, but they might contain uncoverable bugs, so the user
+should be careful with their usage. Please report any bugs, at:
 
 a dot hatzim at gmail dot com.
 
@@ -36,7 +50,7 @@ NOTES:
 Some functions are not available in the stable version of `S-Lang', that
 is in the time of writing 2.2.2.
 
-A git repository provided by upstream is available.
+A git repository provided by upstream is available at:
 
 git://git.jedsoft.org/git/slang.git
 
@@ -46,3 +60,4 @@ Some time algorithms are still in early stage.
 
 THANKS:
 Many Thanks to John E. Davis (S-Lang author) for his generous advices.
+
