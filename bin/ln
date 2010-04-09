@@ -10,6 +10,7 @@ variable
   Ln_Backup = 0,
   Ln_Suffix = "~",
   Ln_Symlink = 0,
+  Ln_Nodereference = 0,
   Cp_Interactive = 0,
   Cp_Verbose = 0,
   Cp_Force = 0,
@@ -39,6 +40,8 @@ private define ln_usage ()
       " -i, --interactive       Prompt before overwrite\n",
       " -f, --force             Do not prompt before overwriting \n",
       " -v, --verbose           Be verbose  \n",
+      " -n, --no-dereference    Treat destination that is a symlink to a directory \n",
+      "                         as if it were a normal file\n",
       " -b                      Make a backup of each existing destination file\n",
       " -s                      Make symbolic links instead of hard links\n",
       " -S, --suffix=SUFFIX     Override the default backup suffix ~\n",
@@ -59,8 +62,8 @@ private define ln_hardlink (source, dest)
 {
   if (-1 == hardlink (source, dest))
     {
-      ()= fprintf (stderr, "%s: creating symbolic link `%s':\n",
-                   path_basename (__argv[0]), errno_string (errno));
+      ()= fprintf (stderr, "%s: creating symbolic link `%s': %s\n",
+                   path_basename (__argv[0]), dest, errno_string (errno));
       return -1;
     }
 
@@ -71,8 +74,8 @@ private define ln_symlink (source, dest)
 {
   if (-1 == symlink (source, dest))
     {
-      ()= fprintf (stderr, "%s: creating symbolic link `%s':\n",
-                   path_basename (__argv[0]), errno_string (errno));
+      ()= fprintf (stderr, "%s: screating symbolic link `%s': %s\n",
+                   path_basename (__argv[0]), dest, errno_string (errno));
       return -1;
     }
 
@@ -94,8 +97,8 @@ private define ln_main (source, dest)
 
   if ((source == dest)
      || ((st_dest != NULL)
-     && (st_source.st_ino == st_dest.st_ino)
-     && (st_source.st_dev == st_dest.st_dev)))
+     && (st_source.st_ino == st_dest.st_ino && 0 == Ln_Nodereference)
+     && (st_source.st_dev == st_dest.st_dev && 0 == Ln_Nodereference)))
     {
       ()= fprintf (stderr, "%s: `%s' and `%s' are the same file\n",
                    path_basename (__argv[0]), source, dest);
@@ -110,39 +113,22 @@ private define ln_main (source, dest)
       return -1;
     }
 
-  % get the current dir and 'concat' it with the source because
-  % slsh> mkdir ("test");
-  %0
-  %slsh> chdir ("test");
-  %0
-  %slsh> !touch a;      
-  %slsh> symlink ("a", "b");
-  %0
-  %slsh> st = stat_file("b");
-  %slsh> st;                 
-  %Struct_Type with 12 fields
-  %slsh> mkdir ("newdir"); 
-  %0
-  %slsh> symlink ("a", "newdir/c");
-  %0
-  %slsh> st = stat_file ("newdir/c");
-  %slsh> st;                         
-  %NULL
-  % slsh> readlink ("newdir/c");                                                                                                   
-  % a
-  % symlink creates a dangling link if you don't call it with an absolute path
+  % get the current dir and 'concat' it with the source 
+  % to avoid creating a dangling link (under circumstances) 
   ifnot (path_is_absolute (source))
-    source = path_concat (getcwd (), source); 
+    source = path_concat (getcwd (), source);
 
-  % if dest is an existing dir, the new dest = dest and the basename of source 
-  if (NULL != st_dest && __is_directory(dest))
-    {
-      dest = path_concat (dest, path_basename (source));
-      st_dest = stat_file (dest);
-    }
+  % if destination is an existing dir, then new dest = dest and the basename of source 
+  if (NULL != st_dest && __is_directory (dest))
+    ifnot (__is_file_symlink (dest))
+      {
+        dest = path_concat (dest, path_basename (source));
+        st_dest = stat_file (dest);
+      }
   
-  % if source exists and it is an existing dir, abort
-  if (NULL !=  st_dest && __is_directory(dest))
+
+  % if destination exists and it is an existing dir, abort
+  if (NULL !=  st_dest && __is_directory (dest) && 0 == Ln_Nodereference)
     {
       ()= fprintf (stderr, "%s: `%s': cannot overwrite directory\n",
                    path_basename (__argv[0]), source);
@@ -170,11 +156,20 @@ private define ln_main (source, dest)
       if (Ln_Backup || Ln_Force)
         {
           variable backup = strcat (dest, Ln_Suffix);
-          if (-1 == copy([dest], backup))
-              {
-                ()= remove (backup);
+          if (__is_file_symlink (dest))
+            {
+              variable
+                value = readlink (dest),
+                st_backup = stat_file (backup);
+              
+              if (NULL != st_backup)
+                if (-1 == remove (backup))
+                  return -1;
+              if (-1 == ln_symlink (value, backup))
                 return -1;
-              }
+            }
+          else if (-1 == copy([dest], backup))
+            return -1;
 
           if (__is_file_executable (source))
             chmod (dest, 0755);
@@ -186,6 +181,15 @@ private define ln_main (source, dest)
       if (Ln_Force)
         ()= remove (dest);
     }
+  
+  if (NULL != st_dest && __is_directory (dest) && (Ln_Nodereference && (Ln_Force || Ln_Backup)))
+    if (-1 == remove (dest))
+      {
+        if (__is_initialized (&backup))
+          ()= remove (backup);
+
+        return -1;
+      }
 
   % See if we want to do a symbolic link ot hardlink
   % and call the appropriate function
@@ -193,9 +197,12 @@ private define ln_main (source, dest)
     {
       if (-1 == ln_symlink (source, dest))
         {
-          if (Ln_Force)
-            copy ([backup], dest);
-
+          if (__is_initialized (&backup))
+            if (__is_file_symlink (backup))
+              ln_symlink (value, dest);
+            else
+              copy ([backup], dest);
+ 
           return -1;
         }
     }
@@ -203,8 +210,11 @@ private define ln_main (source, dest)
     {
       if (-1 == ln_hardlink (source, dest))
         {
-          if (Ln_Force)
-            copy ([backup], dest);
+          if (__is_initialized (&backup))
+            if (__is_file_symlink (backup))
+              ln_symlink (value, dest);
+            else
+              copy ([backup], dest);
 
           return -1;
         }
@@ -212,9 +222,9 @@ private define ln_main (source, dest)
   
   if (Ln_Verbose)
     if (Ln_Symlink)
-      ()= fprintf (stdout, "`%s' -> `%s' %s\n", source, dest, backuptext);
+      ()= fprintf (stdout, "`%s' -> `%s' %s\n", dest, source, backuptext);
     else
-      ()= fprintf (stdout, "`%s' => `%s' %s\n", source, dest, backuptext);
+      ()= fprintf (stdout, "`%s' => `%s' %s\n", dest, source, backuptext);
   
   if (Ln_Force)
     ifnot (Ln_Backup)
@@ -230,6 +240,7 @@ define slsh_main ()
   c.add("h|help", &ln_usage);
   c.add("version", &ln_version);
   c.add("i|interactive", &Ln_Interactive);
+  c.add("n|--no-dereference", &Ln_Nodereference);
   c.add("f|force", &Ln_Force);
   c.add("v|verbose", &Ln_Verbose);
   c.add("b", &Ln_Backup);

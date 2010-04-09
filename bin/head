@@ -43,7 +43,7 @@ define slsh_main ()
 
   variable buf;
 
-  if (1 == __argc || __is_same (__argv[i], "-"))
+  if (1 == __argc || __argc == i || __is_same (__argv[i], "-"))
     {
       while (-1 != fgets (&buf, stdin) && lines)
         {

@@ -68,7 +68,7 @@ define rm_main (files)
             continue;
           }
 
-      ifnot (__is_file_writable (file))
+      if (0 == __is_file_writable (file) && 0 ==  __is_file_symlink (file))
         {
           ()= fprintf (stderr, "%s: cannot remove `%s': Permission denied\n",
               path_basename (__argv[0]), file);
@@ -76,7 +76,7 @@ define rm_main (files)
           continue;
         }
 
-      if (__is_directory (file))
+      if (__is_directory (file) && 0 == __is_file_symlink (file))
         ifnot (Rm_Recursive)
           {
             ()= fprintf (stderr, "%s: omitting directory `%s'\n",

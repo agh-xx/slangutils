@@ -42,7 +42,7 @@ define slsh_main ()
   variable i = c.process (__argv, 1);
 
   variable buf, line, len;
-  if (1 == __argc || __is_same (__argv[i], "-"))
+  if (1 == __argc || __argc == i || __is_same (__argv[i], "-"))
     {
       buf = fgetslines (stdin);
       len = length (buf);
