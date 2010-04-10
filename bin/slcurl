@@ -15,11 +15,7 @@ private variable
   Curl_Useragent,
   Curl_Remoteall = 0,
   Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
-% Is there any other way to search for *.sl, based on the relative path
-% of the current script? If we specify "../share/slsh", and we are in a different
-% directory of the script, this will fail, neither getcwd () works in that case
 
-% I'm not sure if we need to add the get_slang_path () here, but nothing fails
 set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
 
 ()= evalfile ("message");

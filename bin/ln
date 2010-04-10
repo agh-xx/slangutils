@@ -89,11 +89,17 @@ private define ln_main (source, dest)
 
   % check if source exists first
   if (NULL == st_source)
-   {
-     ()= fprintf (stderr, "%s: accessing `%s': No such file or directory\n",
-                  path_basename (__argv[0]), source);
-     return -1;
-   }
+    {
+      st_source = stat_file (path_concat (path_dirname (dest), source));
+      if (NULL == st_source)
+        {
+          ()= fprintf (stderr, "%s: accessing `%s': No such file or directory\n",
+                       path_basename (__argv[0]), source);
+          return -1;
+        }
+      else
+         variable notabsolutepath = 1;
+    }
 
   if ((source == dest)
      || ((st_dest != NULL)
@@ -116,7 +122,8 @@ private define ln_main (source, dest)
   % get the current dir and 'concat' it with the source 
   % to avoid creating a dangling link (under circumstances) 
   ifnot (path_is_absolute (source))
-    source = path_concat (getcwd (), source);
+    ifnot (__is_initialized (&notabsolutepath))
+      source = path_concat (getcwd (), source);
 
   % if destination is an existing dir, then new dest = dest and the basename of source 
   if (NULL != st_dest && __is_directory (dest))
