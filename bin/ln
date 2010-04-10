@@ -103,8 +103,8 @@ private define ln_main (source, dest)
 
   if ((source == dest)
      || ((st_dest != NULL)
-     && (st_source.st_ino == st_dest.st_ino && 0 == Ln_Nodereference)
-     && (st_source.st_dev == st_dest.st_dev && 0 == Ln_Nodereference)))
+     && (st_source.st_ino == st_dest.st_ino && 0 == Ln_Nodereference && 0 == Ln_Force)
+     && (st_source.st_dev == st_dest.st_dev && 0 == Ln_Nodereference && 0 == Ln_Force)))
     {
       ()= fprintf (stderr, "%s: `%s' and `%s' are the same file\n",
                    path_basename (__argv[0]), source, dest);
@@ -233,9 +233,8 @@ private define ln_main (source, dest)
     else
       ()= fprintf (stdout, "`%s' => `%s' %s\n", dest, source, backuptext);
   
-  if (Ln_Force)
-    ifnot (Ln_Backup)
-      ()= remove (backup);
+  if (Ln_Force && 0 == Ln_Backup && __is_initialized (&backup))
+    ()= remove (backup);
 
   return 0;
 
