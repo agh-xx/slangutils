@@ -1,0 +1,279 @@
+#!/usr/bin/env slsh
+
+require ("cmdopt");
+
+variable
+  Id_Version = "0.1.0",
+  Id_Group = 0,
+  Id_Groups = 0,
+  Id_Name = 0,
+  Id_Real = 0,
+  Id_User = 0,
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+()= evalfile ("passwd_group");
+
+private define id_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s [options] [username]  \n", path_basename (__argv[0])),
+      "Options:\n",
+      " -g, --group             Print only the effective group ID\n",
+      " -G, --groups            Print all group IDs\n",
+      " -n, --name              Print a name instead of a number, with -ugG\n",
+      " -r, --real              Print the real ID instead of the effective ID, with -ugG\n",
+      " -u, --user              Print only the effective user ID\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+    ];
+
+  print_usage (Opts);
+  exit (0);
+}
+
+private define id_version ()
+{
+  print_version (Id_Version);
+  exit (0);
+}
+
+private define get_name ()
+{
+  variable
+    uid = getuid (),
+    s = getpwuid (uid);
+
+  if (NULL == s)
+    return NULL;
+  else
+    return s.pw_name;
+}
+
+private define id_name (s, str)
+{
+  if (Id_Group)
+    {
+      variable grname = getgrgid (s.pw_gid);
+      if (NULL == grname)
+        return -1;
+      else
+        {
+          @str = grname.gr_name;
+          return 0;
+        }
+    }
+
+  if (Id_Groups)
+    {
+      variable grnames =  getgrouplist (s.pw_name);
+      ifnot (length (grnames))
+        return -1;
+      else
+        {
+          @str = strjoin (grnames, " ");
+          return 0;
+        }
+    }
+
+  if (Id_User)
+    @str = s.pw_name;
+
+  return 0;
+}
+
+private define id_real (s, str)
+{
+  if (Id_Group)
+    {
+      @str = s.pw_gid;
+      return 0;
+    }
+
+  if (Id_Groups)
+    {
+      variable grnames =  getgrouplistgid (s.pw_name, s.pw_gid);
+      ifnot (length (grnames))
+        return -1;
+      else
+        {
+          @str = strjoin (grnames, " ");
+          return 0;
+        }
+    }
+
+  if (Id_User)
+    @str = s.pw_uid;
+
+  return 0;
+}
+
+define id_all (s)
+{
+  variable str, output = "uid=";
+  Id_User = 1;
+  if (-1 == id_real (s, &str)) 
+    return -1;
+  else
+    output = strcat (output, __tmp (str));
+
+  if (-1 == id_name (s, &str)) 
+    return -1;
+  else
+    {
+      Id_User = 0;
+      output = strcat (output, "(", __tmp (str), ")");
+    }
+
+  Id_Group = 1;
+  if (-1 == id_real (s, &str)) 
+    return -1;
+  else
+    output = strcat (output, " gid=", __tmp (str));
+
+  if (-1 == id_name (s, &str)) 
+    return -1;
+  else
+    {
+      Id_Group = 0;
+      output = strcat (output, "(", __tmp (str), ") groups=");
+    }
+
+  Id_Groups = 1;
+  if (-1 == id_real (s, &str)) 
+    return -1;
+
+  variable gids = strtok (__tmp (str));
+
+  if (-1 == id_name (s, &str)) 
+    return -1;
+
+  variable grnames = strtok (str);
+  
+  _for (0, length (gids) - 1, 1)
+    {
+      variable index = ();
+      output = strcat (output, gids[index], "(", grnames[index], "),");
+    }
+  
+  output = strtrim_end (output, ","); 
+  
+  ()= fprintf (stdout, "%s\n", output);
+
+  return 0;
+}
+
+define id_main (s)
+{
+  variable str;
+  if (Id_Name)
+    if (-1 == id_name (s, &str))
+      return -1;
+    else
+      {
+        ()= fprintf (stdout, "%s\n", str);
+        return 0;
+      }
+  
+  if (Id_Real)
+    if (-1 == id_real (s, &str))
+      return -1;
+    else
+      {
+        ()= fprintf (stdout, "%s\n", str);
+        return 0;
+      }
+  
+  if (Id_User)
+    if (-1 == id_real (s, &str)) 
+      return -1;
+    else
+      {
+        ()= fprintf (stdout, "%s\n", str);
+        return 0;
+      }
+  
+  if (Id_Group)
+    if (-1 == id_real (s, &str)) 
+      return -1;
+    else
+      {
+        ()= fprintf (stdout, "%s\n", str);
+        return 0;
+      }
+  
+  if (Id_Groups)
+    if (-1 == id_real (s, &str)) 
+      return -1;
+    else
+      {
+        ()= fprintf (stdout, "%s\n", str);
+        return 0;
+      }
+}
+
+
+define slsh_main ()
+{
+  variable c = cmdopt_new ();
+  c.add("h|help", &id_usage);
+  c.add("version", &id_version);
+  c.add("g|group", &Id_Group);
+  c.add("G|Groups", &Id_Groups);
+  c.add("n|name", &Id_Name);
+  c.add("r|real", &Id_Real);
+  c.add("u|user", &Id_User);
+
+  variable i = c.process (__argv, 1);
+ 
+  variable name, t = Id_Group + Id_Groups + Id_User;
+  if (t == 0 && (Id_Name || Id_Real))
+    {
+      ()= fprintf (stderr, "%s: cannot print only names or real IDs in default format\n",
+                   path_basename (__argv[0]));
+      exit (1);
+    }
+  else if (t > 1)
+    {
+      ()= fprintf (stderr, "%s: cannot print \"only\" of more than one choice\n",
+                   path_basename (__argv[0]));
+      exit (1);
+    }
+
+  if (i < __argc)
+    if (2 == __argc - i)
+      {
+        ()= fprintf (stderr, "%s: extra operand `%s'\n", path_basename (__argv[0]), __argv[-1]);
+        exit (1);
+      }
+    else
+      name = __argv[-1];
+
+  ifnot (__is_initialized (&name))
+    {
+      name = get_name ();
+      if (NULL == name)
+        exit (1);
+    }
+
+  variable s = getpwnam (name);
+  if (NULL == s )
+    {
+      ()= fprintf (stderr, "%s: %s: No such user\n", path_basename (__argv[0]), name);
+      exit (1);
+    }
+  
+  if (__argc == 1 || 0 == t)
+    if (-1 == id_all (s))
+      exit (1);
+    else
+      exit (0);
+      
+  if (-1 == id_main (s))
+    exit (1);
+     
+  exit (0);
+}
