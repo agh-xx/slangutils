@@ -18,9 +18,38 @@ set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
 
 private define id_usage ()
 {
-  variable Opts =
+  variable Opts;
+  
+  if (__is_same ("groups", path_basename (__argv[0])))
+    Opts =
+    [
+      sprintf ("Usage: %s [username]  \n", path_basename (__argv[0])),
+      "Print group memberships for USERNAME or, if no USERNAME is specified, for\n",
+      "the current process.\n",
+      "Options:\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n\n",
+      "groups is part of slangutils (http://github.com/agh/slangutils)\n",
+      sprintf ("groups version: %s\n", Id_Version)
+    ];
+  else if (__is_same ("whoami", path_basename (__argv[0])))
+    Opts = 
+    [
+      sprintf ("Usage: %s\n", path_basename (__argv[0])),
+      "Print the user name associated with the current effective user ID.\n",
+      "Same as id -un.\n",
+      "Options:\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n\n",
+      "whoami is part of slangutils (http://github.com/agh/slangutils)\n",
+      sprintf ("whoami version: %s\n", Id_Version)
+    ];
+  else 
+    Opts =
     [
       sprintf ("Usage: %s [options] [username]  \n", path_basename (__argv[0])),
+      "Print user and group information for the specified USERNAME,\n",
+      "or (when USERNAME omitted) for the current user.\n",
       "Options:\n",
       " -g, --group             Print only the effective group ID\n",
       " -G, --groups            Print all group IDs\n",
@@ -28,7 +57,10 @@ private define id_usage ()
       " -r, --real              Print the real ID instead of the effective ID, with -ugG\n",
       " -u, --user              Print only the effective user ID\n",
       " --version               Show version\n",
-      " -h, --help              Show this message\n"
+      " -h, --help              Show this message\n\n",
+      "Id is part of slangutils (http://github.com/agh/slangutils)\n",
+      sprintf ("id version: %s\n", Id_Version)
+
     ];
 
   print_usage (Opts);
@@ -228,7 +260,21 @@ define slsh_main ()
   c.add("u|user", &Id_User);
 
   variable i = c.process (__argv, 1);
- 
+
+  if (__is_same ("groups", path_basename (__argv[0])))
+    {
+      variable groups_mode = 1; 
+      Id_Name = 1;
+      Id_Groups = 1;
+    }
+
+  if (__is_same ("whoami", path_basename (__argv[0])))
+    {
+      variable whoami_mode = 1;
+      Id_Name = 1;
+      Id_User = 1;
+    }
+
   variable name, t = Id_Group + Id_Groups + Id_User;
   if (t == 0 && (Id_Name || Id_Real))
     {
@@ -245,6 +291,11 @@ define slsh_main ()
 
   if (i < __argc)
     if (2 == __argc - i)
+      {
+        ()= fprintf (stderr, "%s: extra operand `%s'\n", path_basename (__argv[0]), __argv[-1]);
+        exit (1);
+      }
+    else if (1 == __argc - i && __is_initialized (&whoami_mode))
       {
         ()= fprintf (stderr, "%s: extra operand `%s'\n", path_basename (__argv[0]), __argv[-1]);
         exit (1);
@@ -266,7 +317,9 @@ define slsh_main ()
       exit (1);
     }
   
-  if (__argc == 1 || 0 == t)
+  if ((__argc == 1 || 0 == t)
+      && 0 == __is_initialized (&groups_mode)
+      && 0 == __is_initialized (&whoami_mode))
     if (-1 == id_all (s))
       exit (1);
     else
