@@ -1,0 +1,99 @@
+#!/usr/bin/env slsh
+
+require ("cmdopt");
+
+variable
+  Sleep_Version = "0.1.0",
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+
+private define sleep_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s NUMBER[SUFFIX]\n", path_basename (__argv[0])),
+      "SUFFIX may be `s' for seconds (the default),\n",
+      "`m' for minutes, `h' for hours or `d' for days.\n",
+      "Options:\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+    ];
+
+  print_usage (Opts);
+  exit (0);
+}
+
+private define sleep_version ()
+{
+  print_version (Sleep_Version);
+  exit (0);
+}
+
+private define sleep_seconds (s, seconds)
+{
+  variable sa, multiplier, index, suffix = char (s[-1]);
+
+  ifnot (isdigit (suffix))
+    switch (suffix)
+      { case "s": multiplier = 1;}
+      { case "m": multiplier = 60;}
+      { case "h": multiplier = 60 * 60;}
+      { case "d": multiplier = 60 * 60 * 24;}
+      { ()= fprintf (stderr, "%s: invalid time interval `%s'\n", path_basename (__argv[0]), s);
+        return -1;
+      }
+   
+  if (__is_initialized (&multiplier))
+    sa = s[[:-2]];
+  else
+    {
+      sa = s;
+      multiplier = 1;
+    }
+
+  _for index (0, strlen (sa) - 1, 1)
+    ifnot (isdigit (s[index]))
+      {
+        ()= fprintf (stderr, "%s: invalid time interval `%s'\n", path_basename (__argv[0]), s);
+        return -1;
+      }
+
+  @seconds += atof (sa) * multiplier;
+  return 0;
+}
+
+private define sleep_main (arglist)
+{
+  variable seconds = 0.0;
+  foreach (arglist)
+    {
+      variable arg = ();
+      if (-1 == sleep_seconds (arg, &seconds))
+        return -1;
+    }
+  
+  sleep (seconds);
+  return 0;
+}
+
+define slsh_main ()
+{
+  variable c = cmdopt_new ();
+  c.add("h|help", &sleep_usage);
+  c.add("version", &sleep_version);
+  variable i = c.process (__argv, 1);
+
+  if (1 == __argc)
+    {
+      ()= fprintf (stderr, "%s: missing operand\n", path_basename (__argv[0]));
+      exit (1);
+    }
+  
+  if (-1 == sleep_main (__argv[[1:__argc-1]]))
+    exit (1);
+
+  exit (0);
+}
