@@ -1,0 +1,62 @@
+#!/usr/bin/env slsh
+
+require ("cmdopt");
+
+variable
+  Readlink_Version = "0.1.0",
+  Readlink_Nonewline = 0,
+  Slsh_Path = strtrim_end (path_concat (getcwd(), path_dirname (__argv[0])), "/.");
+
+set_slang_load_path (path_concat (Slsh_Path, "../share/slsh"));
+
+()= evalfile ("message");
+
+private define readlink_usage ()
+{
+  variable Opts =
+    [
+      sprintf ("Usage: %s [option] file\n", path_basename (__argv[0])),
+      "Options:\n",
+      " -n, --no-newline        Do not output the trailing newline\n",
+      " --version               Show version\n",
+      " -h, --help              Show this message\n"
+    ];
+
+  print_usage (Opts);
+  exit (0);
+}
+
+private define readlink_version ()
+{
+  print_version (Readlink_Version);
+  exit (0);
+}
+
+define slsh_main ()
+{
+  variable c = cmdopt_new ();
+  c.add("h|help", &readlink_usage);
+  c.add("version", &readlink_version);
+  c.add("n|no-newline", &Readlink_Nonewline);
+  variable i = c.process (__argv, 1);
+  
+  if (1 == __argc)
+    {
+      ()= fprintf (stderr, "%s: missing operand\n", path_basename (__argv[0]));
+      exit (1);
+    }
+  
+  variable output = readlink (__argv[i]);
+  if (NULL == output)
+    {
+      ()= fprintf (stderr, "%s: %s\n", path_basename (__argv[0]), errno_string (errno));
+      exit (1);
+    }
+ 
+  ifnot (Readlink_Nonewline) 
+    ()= fprintf (stdout, "%s\n", output);
+  else
+    ()= fputs (output, stdout);
+
+  exit (0);
+}
